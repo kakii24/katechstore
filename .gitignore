@@ -1,0 +1,31 @@
+# Environment variables & secrets
+.env
+.env.*
+*.env
+site/.env
+
+# Dependencies & Build
+node_modules/
+dist/
+build/
+
+# Databases & Backups
+*.sqlite
+*.sqlite3
+*.db
+katech.sqlite
+katech-backup.sqlite
+
+# Archives & Temporary files
+*.zip
+*.rar
+*.tar.gz
+scratch/
+.system_generated/
+*.log
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
