@@ -1,0 +1,1 @@
+import{ah as e,al as o,s as r,v as i}from"./index-katech-2026.js";const t="audit-logs",a=[],n=100;function c(){return e({key:t,fromStore:s=>s.auditLogs,fromHttp:async()=>o(t,await r.get(i.analytics.audit(),{perPage:n}),a),fallback:a})}export{c as u};

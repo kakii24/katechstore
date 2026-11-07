@@ -1,0 +1,1 @@
+import{o as t}from"./index-katech-2026.js";const __ks=e=>(e&&e.stock!=="out"&&e.stock!=="out_of_stock"&&e.stock!==0&&e.stock!=="0")?1:0;function r(){const d=t().data;return Array.isArray(d)?[...d].sort((a,b)=>__ks(b)-__ks(a)):d}export{r as u};
