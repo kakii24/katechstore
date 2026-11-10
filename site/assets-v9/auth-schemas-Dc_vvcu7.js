@@ -1,0 +1,1 @@
+import{s}from"./types-Dg1kyhLS.js";const e=10,m=200,t=s().trim().min(1).max(255).refine(a=>/^[^@\s]+@[^@\s]+$/.test(a),{message:"email"}),n=s().min(e,{message:"tooShort"}).max(m,{message:"tooLong"});export{m as P,e as a,t as e,n as p};
