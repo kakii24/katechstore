@@ -104,6 +104,46 @@ class KaTechMarketing {
             if (!in_array('source', $columns)) {
                 @self::$db->exec("ALTER TABLE subscribers ADD COLUMN source TEXT");
             }
+
+            // Migration douce pour les colonnes de réinitialisation de mot de passe
+            $stmtU = self::$db->query("PRAGMA table_info(users)");
+            $uCols = [];
+            if ($stmtU) {
+                while ($r = $stmtU->fetch(PDO::FETCH_ASSOC)) {
+                    $uCols[] = $r['name'];
+                }
+            }
+            if (!in_array('reset_password_token', $uCols)) {
+                @self::$db->exec("ALTER TABLE users ADD COLUMN reset_password_token TEXT");
+            }
+            if (!in_array('reset_password_expires', $uCols)) {
+                @self::$db->exec("ALTER TABLE users ADD COLUMN reset_password_expires TEXT");
+            }
+
+            // Table de suivi des réinitialisations de mot de passe
+            self::$db->exec("
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    email TEXT,
+                    token_hash TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    used_at TEXT NULL,
+                    created_at TEXT NOT NULL
+                );
+            ");
+
+            // Migration douce pour la colonne email dans password_resets
+            $stmtPR = self::$db->query("PRAGMA table_info(password_resets)");
+            $prCols = [];
+            if ($stmtPR) {
+                while ($r = $stmtPR->fetch(PDO::FETCH_ASSOC)) {
+                    $prCols[] = $r['name'];
+                }
+            }
+            if (!in_array('email', $prCols)) {
+                @self::$db->exec("ALTER TABLE password_resets ADD COLUMN email TEXT");
+            }
         } catch (Exception $e) {
             error_log('[Marketing DB Error] ' . $e->getMessage());
         }
@@ -599,4 +639,546 @@ HTML;
 HTML;
         exit;
     }
+
+    /**
+     * Envoie un e-mail de bienvenue moderne et responsive aux nouveaux membres
+     */
+    public static function sendWelcomeEmail($userEmail, $userName = '') {
+        $userEmail = trim(strtolower($userEmail));
+        if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) return ['success' => false, 'error' => 'Email invalide'];
+
+        $cleanName = trim($userName);
+        $displayName = !empty($cleanName) ? htmlspecialchars($cleanName) : 'Cher membre';
+        $subject = "👋 Bienvenue chez KA Tech Store ! Votre compte est prêt";
+
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenue chez KA Tech Store</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #090d16; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+          
+          <!-- En-tête avec Logo -->
+          <tr>
+            <td align="center" style="padding: 35px 20px 25px; background: linear-gradient(180deg, #1e293b 0%, #111827 100%); border-bottom: 1px solid #1f2937;">
+              <img src="https://katechstore.net/ka-tech-logo-new.png" alt="KA Tech Store" style="max-height: 48px; width: auto; display: block; margin-bottom: 12px;">
+              <span style="display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #3b82f6; background: rgba(59, 130, 246, 0.1); padding: 4px 12px; border-radius: 9999px; border: 1px solid rgba(59, 130, 246, 0.2);">Espace Membre Officiel</span>
+            </td>
+          </tr>
+
+          <!-- Corps du message -->
+          <tr>
+            <td style="padding: 35px 30px 20px;">
+              <h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 800; color: #ffffff; line-height: 1.3;">
+                Bienvenue dans l'univers KA Tech, {$displayName}&nbsp;!
+              </h1>
+              <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #94a3b8;">
+                Nous sommes ravis de vous compter parmi nos membres. Votre compte <strong>KA Tech Store</strong> est désormais actif et vous donne accès au meilleur de la tech en Algérie.
+              </p>
+
+              <!-- Carte des Avantages Membre -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; margin-bottom: 30px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <div style="margin-bottom: 16px; display: flex; align-items: flex-start;">
+                      <span style="font-size: 20px; margin-right: 12px; line-height: 1;">📦</span>
+                      <div>
+                        <strong style="color: #f1f5f9; font-size: 14px; display: block; margin-bottom: 2px;">Suivi de commande direct</strong>
+                        <span style="color: #94a3b8; font-size: 13px; line-height: 1.5;">Suivez l'expédition de vos colis partout en Algérie (58 wilayas) en direct depuis votre espace client.</span>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px; display: flex; align-items: flex-start;">
+                      <span style="font-size: 20px; margin-right: 12px; line-height: 1;">💻</span>
+                      <div>
+                        <strong style="color: #f1f5f9; font-size: 14px; display: block; margin-bottom: 2px;">PC Portables & Matériel Pro</strong>
+                        <span style="color: #94a3b8; font-size: 13px; line-height: 1.5;">Accédez en priorité à nos arrivages d'ordinateurs portables, stations fixes et composants certifiés.</span>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px; display: flex; align-items: flex-start;">
+                      <span style="font-size: 20px; margin-right: 12px; line-height: 1;">🛠️</span>
+                      <div>
+                        <strong style="color: #f1f5f9; font-size: 14px; display: block; margin-bottom: 2px;">Configurateur PC sur mesure</strong>
+                        <span style="color: #94a3b8; font-size: 13px; line-height: 1.5;">Créez la machine de vos rêves composant par composant selon vos besoins et votre budget.</span>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; align-items: flex-start;">
+                      <span style="font-size: 20px; margin-right: 12px; line-height: 1;">🛡️</span>
+                      <div>
+                        <strong style="color: #f1f5f9; font-size: 14px; display: block; margin-bottom: 2px;">Garantie Matérielle & Support Dédié</strong>
+                        <span style="color: #94a3b8; font-size: 13px; line-height: 1.5;">Chaque produit est testé et couvert par une garantie officielle avec service après-vente dédié.</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Bouton d'action principal -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding-bottom: 25px;">
+                    <a href="https://katechstore.net" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 15px 36px; border-radius: 10px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); text-align: center;">
+                      Commencer mes achats &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Liens rapides -->
+              <p style="margin: 0; text-align: center; font-size: 13px; color: #64748b;">
+                <a href="https://katechstore.net/account" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Mon Compte</a> &bull;
+                <a href="https://katechstore.net/builder" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Configurateur PC</a> &bull;
+                <a href="https://katechstore.net/contact" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Contact & Support</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Pied de page -->
+          <tr>
+            <td align="center" style="padding: 25px 20px; background-color: #0b0f19; border-top: 1px solid #1f2937; font-size: 12px; color: #64748b;">
+              <p style="margin: 0 0 6px;"><strong>KA Tech Store</strong> &bull; La puissance tech entre vos mains</p>
+              <p style="margin: 0 0 6px;">Alger, Alg&eacute;rie &bull; T&eacute;l : 0555 00 00 00 &bull; contact@katechstore.net</p>
+              <p style="margin: 0;">Vous recevez ce courriel car vous venez de cr&eacute;er un compte sur katechstore.net.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+HTML;
+
+        return self::sendBrevoSmtp($userEmail, $cleanName ?: 'Client KA Tech', $subject, $html);
+    }
+
+    /**
+     * Traite une demande de réinitialisation de mot de passe (Forgot Password)
+     */
+    public static function requestPasswordReset($email) {
+        $email = trim(strtolower($email));
+        $genericResponse = [
+            'success' => true,
+            'ok' => true,
+            'message' => 'Si cette adresse e-mail est associée à un compte KA Tech, vous recevrez un lien de réinitialisation dans quelques instants.'
+        ];
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $genericResponse;
+        }
+
+        $db = self::getDb();
+        if (!$db) return $genericResponse;
+
+        $userFound = null;
+        try {
+            $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email = :email LIMIT 1");
+            $stmt->execute([':email' => $email]);
+            $userFound = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$userFound) {
+                $stmtC = $db->prepare("SELECT id, name, email FROM customers WHERE email = :email LIMIT 1");
+                $stmtC->execute([':email' => $email]);
+                $cust = $stmtC->fetch(PDO::FETCH_ASSOC);
+                if ($cust) {
+                    $userFound = [
+                        'id' => $cust['id'],
+                        'name' => $cust['name'] ?: 'Client',
+                        'email' => $cust['email']
+                    ];
+                }
+            }
+        } catch (Exception $e) {
+            error_log('[Forgot Password DB Error] ' . $e->getMessage());
+        }
+
+        $rawToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $expiresAt = date('c', time() + 3600); // 1 heure
+        $now = date('c');
+
+        $userId = $userFound['id'] ?? ('usr_' . substr($tokenHash, 0, 12));
+        $userName = $userFound['name'] ?? 'Cher membre';
+
+        try {
+            $resetId = 'rst_' . bin2hex(random_bytes(8));
+            $ins = @$db->prepare("INSERT INTO password_resets (id, user_id, email, token_hash, expires_at, created_at) VALUES (:id, :uid, :email, :thash, :exp, :now)");
+            if ($ins) {
+                $ins->execute([
+                    ':id' => $resetId,
+                    ':uid' => $userId,
+                    ':email' => $email,
+                    ':thash' => $tokenHash,
+                    ':exp' => $expiresAt,
+                    ':now' => $now
+                ]);
+            } else {
+                $ins2 = @$db->prepare("INSERT INTO password_resets (id, user_id, token_hash, expires_at, created_at) VALUES (:id, :uid, :thash, :exp, :now)");
+                if ($ins2) {
+                    $ins2->execute([
+                        ':id' => $resetId,
+                        ':uid' => $userId,
+                        ':thash' => $tokenHash,
+                        ':exp' => $expiresAt,
+                        ':now' => $now
+                    ]);
+                }
+            }
+
+            if ($userFound) {
+                $upd = $db->prepare("UPDATE users SET reset_password_token = :token, reset_password_expires = :exp, updated_at = :now WHERE email = :email");
+                $upd->execute([':token' => $tokenHash, ':exp' => $expiresAt, ':now' => $now, ':email' => $email]);
+            }
+        } catch (Exception $e) {
+            error_log('[Save Reset Token Error] ' . $e->getMessage());
+        }
+
+        $resetUrl = "https://katechstore.net/reset-password?token=" . urlencode($rawToken);
+        $subject = "🔐 Réinitialisation de votre mot de passe — KA Tech Store";
+
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{$subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #090d16; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+          
+          <tr>
+            <td align="center" style="padding: 30px 20px 20px; background: linear-gradient(180deg, #1e293b 0%, #111827 100%); border-bottom: 1px solid #1f2937;">
+              <img src="https://katechstore.net/ka-tech-logo-new.png" alt="KA Tech Store" style="max-height: 48px; width: auto; display: block; margin-bottom: 12px;">
+              <span style="display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #f59e0b; background: rgba(245, 158, 11, 0.1); padding: 4px 12px; border-radius: 9999px; border: 1px solid rgba(245, 158, 11, 0.2);">Sécurité du Compte</span>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 35px 30px 25px;">
+              <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #ffffff;">
+                Demande de réinitialisation de mot de passe
+              </h1>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+                Bonjour <strong>{$userName}</strong>,
+              </p>
+              <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #94a3b8;">
+                Nous avons reçu une demande de réinitialisation du mot de passe pour votre compte KA Tech Store associé à l'adresse <strong>{$email}</strong>.
+              </p>
+
+              <!-- Bouton Reset -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding: 10px 0 30px;">
+                    <a href="{$resetUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 15px 36px; border-radius: 10px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); text-align: center;">
+                      Réinitialiser mon mot de passe &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Avertissement et Expiration -->
+              <div style="background-color: #0f172a; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px; font-size: 13px; color: #f1f5f9; font-weight: 600;">
+                  ⏰ Ce lien est strictement personnel et expirera dans 1 heure.
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                  Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail en toute sécurité. Votre mot de passe actuel reste inchangé.
+                </p>
+              </div>
+
+              <p style="margin: 0; font-size: 12px; color: #64748b; word-break: break-all; line-height: 1.5;">
+                Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br>
+                <a href="{$resetUrl}" style="color: #3b82f6; text-decoration: underline;">{$resetUrl}</a>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding: 25px 20px; background-color: #0b0f19; border-top: 1px solid #1f2937; font-size: 12px; color: #64748b;">
+              <p style="margin: 0 0 6px;"><strong>KA Tech Store</strong> &bull; Alger, Algérie &bull; Tél : 0555 00 00 00 &bull; contact@katechstore.net</p>
+              <p style="margin: 0;">Notification automatique de sécurité.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+HTML;
+
+        self::sendBrevoSmtp($email, $userName, $subject, $html);
+        return $genericResponse;
+    }
+
+    /**
+     * Valide le jeton et met à jour le mot de passe
+     */
+    public static function confirmPasswordReset($token, $newPassword) {
+        $token = trim($token);
+        if (empty($token)) {
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Jeton de réinitialisation manquant.'
+                ]
+            ];
+        }
+
+        if (strlen($newPassword) < 8) {
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Le mot de passe doit comporter au moins 8 caractères.'
+                ]
+            ];
+        }
+
+        $db = self::getDb();
+        if (!$db) {
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'SERVER_ERROR',
+                    'message' => 'Impossible de se connecter à la base de données.'
+                ]
+            ];
+        }
+
+        $tokenHash = hash('sha256', $token);
+        $now = date('c');
+
+        $resetRecord = null;
+        try {
+            $stmt = $db->prepare("SELECT * FROM password_resets WHERE token_hash = :hash AND used_at IS NULL ORDER BY created_at DESC LIMIT 1");
+            $stmt->execute([':hash' => $tokenHash]);
+            $resetRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log('[Reset Verify Error] ' . $e->getMessage());
+        }
+
+        $userRecord = null;
+        if (!$resetRecord) {
+            try {
+                $stmtU = $db->prepare("SELECT * FROM users WHERE reset_password_token = :token LIMIT 1");
+                $stmtU->execute([':token' => $tokenHash]);
+                $userRecord = $stmtU->fetch(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {}
+        } else {
+            try {
+                $stmtU = $db->prepare("SELECT * FROM users WHERE email = :email OR id = :uid LIMIT 1");
+                $stmtU->execute([':email' => $resetRecord['email'], ':uid' => $resetRecord['user_id']]);
+                $userRecord = $stmtU->fetch(PDO::FETCH_ASSOC);
+            } catch (Exception $e) {}
+        }
+
+        $expiresAt = $resetRecord['expires_at'] ?? ($userRecord['reset_password_expires'] ?? null);
+        if (!$expiresAt || strtotime($expiresAt) < time()) {
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Lien de réinitialisation invalide, expiré, ou déjà utilisé. Demandez-en un nouveau depuis « mot de passe oublié ».'
+                ]
+            ];
+        }
+
+        $targetEmail = $resetRecord['email'] ?? ($userRecord['email'] ?? null);
+        $targetUserId = $resetRecord['user_id'] ?? ($userRecord['id'] ?? null);
+        $targetName = $userRecord['name'] ?? 'Client KA Tech';
+
+        if (empty($targetEmail)) {
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Compte utilisateur introuvable.'
+                ]
+            ];
+        }
+
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+
+        try {
+            if ($userRecord) {
+                $upd = $db->prepare("UPDATE users SET password_hash = :hash, reset_password_token = NULL, reset_password_expires = NULL, updated_at = :now WHERE id = :id");
+                $upd->execute([':hash' => $hashedPassword, ':now' => $now, ':id' => $userRecord['id']]);
+            } else {
+                $newUid = $targetUserId ?: ('usr_' . bin2hex(random_bytes(8)));
+                $ins = $db->prepare("INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at) VALUES (:id, :name, :email, :hash, 'customer', 1, :now, :now)");
+                $ins->execute([
+                    ':id' => $newUid,
+                    ':name' => $targetName,
+                    ':email' => $targetEmail,
+                    ':hash' => $hashedPassword,
+                    ':now' => $now
+                ]);
+            }
+
+            $db->prepare("UPDATE password_resets SET used_at = :now WHERE token_hash = :hash")->execute([':now' => $now, ':hash' => $tokenHash]);
+        } catch (Exception $e) {
+            error_log('[Reset Update Error] ' . $e->getMessage());
+            return [
+                'ok' => false,
+                'success' => false,
+                'error' => [
+                    'code' => 'SERVER_ERROR',
+                    'message' => 'Erreur lors de la mise à jour du mot de passe.'
+                ]
+            ];
+        }
+
+        self::sendPasswordResetSecurityConfirmation($targetEmail, $targetName);
+
+        return [
+            'ok' => true,
+            'success' => true,
+            'message' => 'Votre mot de passe a été réinitialisé avec succès ! Vous pouvez maintenant vous connecter.'
+        ];
+    }
+
+    /**
+     * Envoie un email de notification de sécurité après le changement de mot de passe
+     */
+    public static function sendPasswordResetSecurityConfirmation($userEmail, $userName = '') {
+        $userEmail = trim(strtolower($userEmail));
+        if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) return false;
+
+        $displayName = !empty($userName) ? htmlspecialchars(trim($userName)) : 'Cher membre';
+        $subject = "🛡️ Confirmation : Votre mot de passe KA Tech Store a été modifié";
+        $dateFormatted = date('d/m/Y à H:i') . ' (heure locale)';
+
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{$subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f1f5f9;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #090d16; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+          
+          <tr>
+            <td align="center" style="padding: 30px 20px 20px; background: linear-gradient(180deg, #1e293b 0%, #111827 100%); border-bottom: 1px solid #1f2937;">
+              <img src="https://katechstore.net/ka-tech-logo-new.png" alt="KA Tech Store" style="max-height: 48px; width: auto; display: block; margin-bottom: 12px;">
+              <span style="display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 4px 12px; border-radius: 9999px; border: 1px solid rgba(16, 185, 129, 0.2);">Sécurité Confirmée</span>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 35px 30px 25px;">
+              <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #ffffff;">
+                Mot de passe mis à jour avec succès
+              </h1>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+                Bonjour <strong>{$displayName}</strong>,
+              </p>
+              <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #94a3b8;">
+                Le mot de passe associé à votre compte KA Tech Store (<strong>{$userEmail}</strong>) a été modifié le <strong>{$dateFormatted}</strong>.
+              </p>
+
+              <!-- Bouton Connexion -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding: 10px 0 25px;">
+                    <a href="https://katechstore.net/auth" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 15px 36px; border-radius: 10px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); text-align: center;">
+                      Se connecter à mon compte &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alerte si non autorisé -->
+              <div style="background-color: #0f172a; border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px;">
+                <p style="margin: 0 0 8px; font-size: 13px; color: #f87171; font-weight: 700;">
+                  ⚠️ Vous n'avez pas demandé ce changement ?
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                  Si vous n'êtes pas à l'origine de cette modification, votre compte a peut-être été compromis. Contactez immédiatement notre assistance à <strong>kaa.tech.48@gmail.com</strong> ou au <strong>0555 00 00 00</strong> afin de sécuriser vos accès.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding: 25px 20px; background-color: #0b0f19; border-top: 1px solid #1f2937; font-size: 12px; color: #64748b;">
+              <p style="margin: 0 0 6px;"><strong>KA Tech Store</strong> &bull; Alger, Algérie &bull; Tél : 0555 00 00 00 &bull; contact@katechstore.net</p>
+              <p style="margin: 0;">Notification automatique de sécurité.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+HTML;
+
+        return self::sendBrevoSmtp($userEmail, $displayName, $subject, $html);
+    }
+
+    /**
+     * Vérifie si un utilisateur possède un mot de passe mis à jour en local
+     */
+    public static function verifyLocalUserLogin($email, $password) {
+        $email = trim(strtolower($email));
+        if (empty($email) || empty($password)) return null;
+
+        $db = self::getDb();
+        if (!$db) return null;
+
+        try {
+            $stmt = $db->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
+            $stmt->execute([':email' => $email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && !empty($user['password_hash'])) {
+                if (password_verify($password, $user['password_hash'])) {
+                    return [
+                        'data' => [
+                            'user' => [
+                                'id' => $user['id'],
+                                'name' => $user['name'] ?: 'Client KA Tech',
+                                'email' => $user['email'],
+                                'role' => $user['role'] ?: 'customer'
+                            ],
+                            'expiresAt' => date('c', time() + 86400 * 7)
+                        ]
+                    ];
+                }
+            }
+        } catch (Exception $e) {
+            error_log('[Verify Local User Error] ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
 }

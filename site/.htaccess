@@ -47,6 +47,7 @@ DirectoryIndex index.html index.php caisse.php
     # Route unsubscribe and marketing test endpoints to api_proxy.php
     RewriteRule ^unsubscribe(.*)$ api_proxy.php [QSA,L]
     RewriteRule ^api/test-marketing-email(.*)$ api_proxy.php [QSA,L]
+    RewriteRule ^api/test-welcome-email(.*)$ api_proxy.php [QSA,L]
 
     # Route /api/v1 calls to the API gateway proxy
     RewriteRule ^api/v1(.*)$ api_proxy.php [QSA,L]

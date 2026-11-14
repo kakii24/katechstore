@@ -52,6 +52,70 @@ if (strpos($requestUri, 'test-marketing-email') !== false) {
     exit;
 }
 
+// 3. Route de test Welcome Email : /api/test-welcome-email?email=...
+if (strpos($requestUri, 'test-welcome-email') !== false) {
+    header('Content-Type: application/json; charset=utf-8');
+    $targetEmail = $_GET['email'] ?? 'kaa.tech.48@gmail.com';
+    $targetName = $_GET['name'] ?? 'Mokhtar - KA Tech';
+    $sendResult = KaTechMarketing::sendWelcomeEmail($targetEmail, $targetName);
+    echo json_encode([
+        'success' => $sendResult['success'],
+        'message' => $sendResult['success'] ? "Email de bienvenue envoyé avec succès à {$targetEmail} !" : "Erreur envoi Brevo",
+        'targetEmail' => $targetEmail,
+        'brevo' => $sendResult
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// 4. Traitement Mot de passe oublié : POST /api/v1/auth/forgot-password
+if ((strpos($apiPath, '/auth/forgot-password') !== false || strpos($requestUri, 'forgot-password') !== false) && $method === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true) ?? [];
+    $email = $input['email'] ?? ($_POST['email'] ?? '');
+    $res = KaTechMarketing::requestPasswordReset($email);
+    echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// 5. Traitement Réinitialisation Mot de passe : POST /api/v1/auth/reset-password
+if ((strpos($apiPath, '/auth/reset-password') !== false || strpos($requestUri, 'reset-password') !== false) && $method === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true) ?? [];
+    $token = $input['token'] ?? ($_POST['token'] ?? '');
+    $password = $input['password'] ?? ($_POST['password'] ?? '');
+    $res = KaTechMarketing::confirmPasswordReset($token, $password);
+    if (empty($res['success']) && empty($res['ok'])) {
+        http_response_code(422);
+    }
+    echo json_encode($res, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// 6. Vérification Authentification locale si mot de passe réinitialisé en local : POST /api/v1/auth/login
+if (strpos($apiPath, '/auth/login') !== false && $method === 'POST') {
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true) ?? [];
+    $loginEmail = trim(strtolower($input['email'] ?? ''));
+    $loginPassword = $input['password'] ?? '';
+    
+    $localAuth = KaTechMarketing::verifyLocalUserLogin($loginEmail, $loginPassword);
+    if ($localAuth !== null) {
+        header('Content-Type: application/json; charset=utf-8');
+        $sid = 'katech_sid_' . bin2hex(random_bytes(16));
+        setcookie('katech_sid', $sid, [
+            'expires' => time() + 86400 * 7,
+            'path' => '/',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        echo json_encode($localAuth, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 // Handle direct file upload for /api/v1/media
 if (strpos($apiPath, '/api/v1/media') === 0 && $method === 'POST' && !empty($_FILES)) {
     $uploadsDir = __DIR__ . '/uploads';
@@ -310,16 +374,19 @@ if (strpos($apiPath, '/api/v1/orders') === 0 && $method === 'POST' && ($httpCode
     }
 }
 
-// Hook 3: Capture customer email on user registration (POST /api/v1/auth/register)
+// Hook 3: Capture customer email and send Welcome Email on user registration (POST /api/v1/auth/register)
 if (strpos($apiPath, '/api/v1/auth/register') === 0 && $method === 'POST' && ($httpCode === 200 || $httpCode === 201)) {
     $regData = json_decode($body, true);
     $regEmail = $regData['data']['user']['email'] ?? $regData['data']['email'] ?? null;
+    $regName = $regData['data']['user']['name'] ?? $regData['data']['name'] ?? '';
     if (empty($regEmail) && !empty($rawInput)) {
         $in = json_decode($rawInput, true);
         $regEmail = $in['email'] ?? null;
+        if (empty($regName)) $regName = $in['name'] ?? '';
     }
     if (!empty($regEmail)) {
         KaTechMarketing::captureSubscriber($regEmail, 'register');
+        KaTechMarketing::sendWelcomeEmail($regEmail, $regName);
     }
 }
 
