@@ -1,61 +1,99 @@
-# KA Tech — Système de Caisse & Gestion des Paiements (Sécurisé & Réservé aux Administrateurs)
+# ⚡ KA Tech Store — Plateforme E-Commerce Complète, Caisse POS & Marketing IA
 
-Application sur mesure conçue pour la boutique **KA Tech** afin de suivre en temps réel toutes les entrées et sorties d'argent, ventes de PC, réparations, dépenses du magasin et notes d'équipe.
-
----
-
-## 🔒 Sécurité & Confidentialité Strictes (Non Public)
-
-- **Accès Réservé Exclusivement aux Administrateurs** :  
-  La page ne s'ouvre pas au public. Dès son ouverture, un **écran de verrouillage sécurisé** demande l'authentification avec les identifiants administrateur (`admin@katech.a`).
-- **Données Protégées (HTTP 401 Unauthorized pour le public)** :  
-  Les données financières ne sont pas accessibles aux visiteurs de votre site web. Toute tentative de lecture sans session administrateur est automatiquement bloquée par le serveur Hostinger.
-- **Bouton de Verrouillage Immédiat** :  
-  Un bouton rouge **« 🔒 Verrouiller »** en haut à droite permet de reverrouiller immédiatement la caisse lorsque l'employé quitte le poste.
+> **Site en production** : [katechstore.net](https://katechstore.net)  
+> **Contact & Support** : kaa.tech.48@gmail.com | contact@katechstore.net  
+> **Dépôt GitHub Privé** : [github.com/kakii24/katechstore](https://github.com/kakii24/katechstore)
 
 ---
 
-## 🚀 Utilisation sur le PC du Magasin
+## 🌟 Présentation Générale du Projet
 
-Un raccourci est prêt sur votre Bureau Windows :  
-👉 **`KA Tech - Caisse & Ventes`**
-
-1. **Double-cliquez sur le raccourci sur le Bureau** (ou lancez `Lancer-Caisse.bat`).
-2. Saisissez votre mot de passe administrateur pour déverrouiller la caisse.
-3. Le statut affiche **🟢 "Synchronisé en direct"** : toutes les opérations saisies sont enregistrées immédiatement dans la base de données sécurisée de votre serveur Hostinger.
-
----
-
-## 🛠️ Fonctionnalités du Système
-
-| Type d'opération | Détails saisis par l'employé | Actions & Reçus |
-| :--- | :--- | :--- |
-| **💻 Vente PC / Matériel** | Modèle PC/Laptop, Prix en DA, Nom & Tél client (avec lien WhatsApp), Mode de règlement (Espèces, BaridiMob, Virement, CCP), Garantie offerte (3 mois, 6 mois, 1 an), Vendeur, Notes. | Impression du **Ticket / Facture de vente client** |
-| **🔧 Réparation PC** | Modèle de la machine, Diagnostic & Panne résolue, Montant encaissé (DA), Nom & Tél client, Statut (*Réparé & Payé, Prêt pour retrait, En cours*), Technicien. | Impression du **Bon de réparation client** |
-| **💸 Dépense Magasin** | Motif (consommables, pâte thermique, loyer, internet, café, transport...), Montant déboursé (DA), Justificatif/notes. | Déduit automatiquement du solde espèces |
-| **📝 Notes & Remarques** | Consignes d'équipe, rappels pour le lendemain, clients en attente de pièces. | Visible par l'administrateur et l'équipe |
+**KA Tech Store** est une solution tout-en-un développée sur mesure pour l'écosystème commercial tech en Algérie. Elle combine :
+1. **Un Storefront E-Commerce Public Ultra-Rapide** avec configurateur PC sur mesure, panier, commande et galerie multi-photos.
+2. **Un Panneau d'Administration Centralisé (`/admin`)** pour piloter le catalogue, le stock, les commandes en ligne et les prix d'achat.
+3. **Un Système de Caisse POS & Atelier Réparation (`caisse.php`)** réservé au magasin physique, avec calcul en temps réel de la marge brute et du profit net.
+4. **Un Système de Marketing par E-mail Automatisé** piloté par **Google Gemini AI** et **Brevo SMTP (Sendinblue)** synchronisant l'ensemble des clients du site.
 
 ---
 
-## 📊 Indicateurs Financiers en Temps Réel
-1. **Solde Espèces Caisse (Net Cash)** : Total espèces reçues moins dépenses en espèces.
-2. **Total Ventes PC** : Chiffre d'affaires et compteur du nombre d'ordinateurs vendus.
-3. **Total Réparations** : Montant encaissé pour la maintenance technique.
-4. **Total Dépenses** : Suivi des sorties d'argent de la journée.
-5. **BaridiMob & Virements** : Suivi séparé des encaissements digitaux.
+## 🛒 1. Storefront E-Commerce Public (`katechstore.net`)
+
+- **Catalogue Produits Dynamique** : PC portables bureautique/gamer, ordinateurs de bureau, composants, smartphones et accessoires avec recherche instantanée.
+- **Galerie Multi-Images Haute Performance** : Carrousel matériel avec miniatures synchronisées et zoom interactif.
+- **Configurateur PC Gamer & Pro (`/builder`)** : Montage sur mesure étape par étape (CPU, GPU, RAM, Stockage, Boîtier, Alimentation) avec calcul automatique du total.
+- **Tunnel de Commande Sans Friction (`/checkout`)** : Prise de commande rapide adaptée au marché algérien avec livraison 58 wilayas et paiement à la livraison.
+- **Espace Compte Client, Avis & Favoris** : Authentification JWT, liste de souhaits et système d'avis vérifiés.
+- **Capture Newsletter** : Formulaire d'abonnement dans le pied de page relié directement à la base de données et synchronisé à Brevo.
 
 ---
 
-## 🖨️ Clôture Journalière (Rapport Z) & Export
-- **Bouton « Clôture Z »** : Génère en un clic le rapport récapitulatif de fin de journée prêt à être imprimé et signé.
-- **Exportation Excel / CSV** : Téléchargement instantané de toutes les opérations pour votre comptabilité.
+## 🛠️ 2. Panneau d'Administration (`/admin`)
+
+- **Gestion des Produits & Stock** :
+  - Création et modification de produits avec téléversement de photos multiples.
+  - Saisie du **Prix d'Achat (Cost Price)** sécurisé, masqué au public, pour calculer la rentabilité exacte.
+  - Définition de prix promotionnels déclenchant automatiquement des campagnes marketing par IA.
+- **Gestion des Commandes Web** : Suivi des statuts (en attente, confirmée, expédiée, livrée, annulée).
+- **Liste des Abonnés & Clients** : Visualisation des inscriptions newsletter et acheteurs.
+- **Raccourcis Directs dans le Header** :
+  - 💵 **Accès direct Caisse** (`/caisse.php`)
+  - ✨ **Test Marketing IA** (envoi d'un e-mail de démonstration Gemini + Brevo en un clic)
 
 ---
 
-## 🌐 Déploiement Cloud sur Hostinger (Optionnel)
-Pour y accéder depuis votre smartphone en déplacement :
-1. Ouvrez **Hostinger hPanel** > **File Manager** (Gestionnaire de fichiers).
-2. Ouvrez le dossier `public_html/`.
-3. Uploadez **`caisse.php`**.
-4. Accessible à l'adresse : `https://bisque-shrew-404215.hostingersite.com/caisse.php`  
-   *(Même sur le web, la page exige obligatoirement le mot de passe administrateur pour s'ouvrir).*
+## 💻 3. Caisse Boutique & Gestion Magasin (`caisse.php`)
+
+Système POS sécurisé (HTTP 401 & écran de verrouillage administrateur) dédié au comptoir :
+- **Ventes Comptoir** : Saisie du modèle, prix de vente, mode de paiement (Espèces, BaridiMob, CCP, Virement) et impression du ticket de garantie client.
+- **Atelier Réparations** : Suivi des dépannages techniques et impression du bon de prise en charge.
+- **Dépenses Quotidiennes** : Suivi des sorties de caisse pour le calcul du solde réel.
+- **Analyse Financière & Marge Nette** : Calcul automatique de la marge brute et du bénéfice net en comparant prix de vente et prix d'achat.
+- **Commandes Web en Temps Réel** : Visualisation immédiate des commandes passées sur le site avec option de confirmation ou suppression.
+- **Clôture Journalière (Rapport Z)** : Bilan imprimable en fin de journée.
+
+---
+
+## 📧 4. Système d'Email Marketing Automatisé (Brevo + Google Gemini)
+
+Le système de marketing par e-mail fonctionne de manière transverse sur toute la plateforme :
+
+### A. Capture des Abonnés & Brevo Sync
+- **Points de collecte** :
+  1. Formulaire Newsletter dans le footer de la boutique.
+  2. Finalisation de commande (Checkout) : l'e-mail de l'acheteur est automatiquement abonné.
+  3. Création de compte utilisateur (`/register`).
+- **Synchronisation automatique** vers la **Liste Brevo #2** via l'API REST `POST https://api.brevo.com/v3/contacts`.
+- **Désabonnement en 1 clic** : Route sécurisée `/unsubscribe?token=...` retirant le contact de la base et de la liste Brevo.
+
+### B. Générateur d'E-mails par Intelligence Artificielle (Gemini 2.5 Flash)
+- Prompt ingénierie sur mesure produisant des e-mails HTML responsive modernes avec palette KA Tech (bleu tech, dark mode, call-to-action percutants).
+- Supporte deux types de campagnes :
+  - `new_item` : Annonce exclusive de nouvel arrivage avec visuel, fiche technique et bouton "Découvrir le produit".
+  - `discount` : Alerte baisse de prix / promotion avec badge de réduction en pourcentage (ex: `-15%`).
+
+### C. Déclencheurs Automatiques (Triggers Boutique)
+- **Ajout d'un nouveau produit** dans le catalogue admin (`POST /api/v1/products`) ➔ Génération Gemini et diffusion instantanée par e-mail à tous les abonnés.
+- **Application d'une remise de prix** (`PUT /api/v1/products/:id`) ➔ Campagne flash promotionnelle envoyée automatiquement.
+- **Bouton de Test Immédiat** : Endpoint `/api/test-marketing-email` disponible dans la barre admin et la caisse.
+
+---
+
+## 🔒 Variables d'Environnement & Sécurité
+
+Les secrets de production sont stockés dans le fichier `.env` protégé (non versionné dans git, bloqué par `.htaccess`) :
+```env
+BREVO_API_KEY=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
+BREVO_LIST_ID=2
+BREVO_SENDER_EMAIL=news@katechstore.net
+BREVO_SENDER_NAME="KA Tech Store"
+BREVO_REPLY_TO=kaa.tech.48@gmail.com
+GEMINI_API_KEY=AQ.Ab8RN6LpdUxetV_E3D10YZQaHSktMkIXBg07mDgZKQ_mjrsVQQ
+```
+
+---
+
+## 🚀 Lanceurs & Scripts Utilitaires
+
+- **`Lancer-Site-Vite.bat`** : Lance le serveur de développement local du site web.
+- **`Lancer-Caisse.bat`** : Ouvre directement la caisse de la boutique en mode plein écran.
+- **`Push-GitHub.bat`** : Automatise la synchronisation Git avec le dépôt GitHub privé.
