@@ -76,6 +76,31 @@ Le système de marketing par e-mail fonctionne de manière transverse sur toute 
 - **Application d'une remise de prix** (`PUT /api/v1/products/:id`) ➔ Campagne flash promotionnelle envoyée automatiquement.
 - **Bouton de Test Immédiat** : Endpoint `/api/test-marketing-email` disponible dans la barre admin et la caisse.
 
+### D. E-mail de Bienvenue Automatique aux Nouveaux Membres
+- Dès qu'un nouvel utilisateur s'inscrit sur le site (`POST /api/v1/auth/register`), la passerelle API déclenche de manière asynchrone la fonction `sendWelcomeEmail(userEmail, userName)`.
+- Envoi d'un e-mail transactionnel de bienvenue élégant via Brevo SMTP (`news@katechstore.net`) présentant les avantages membres : suivi des commandes 58 wilayas, arrivages PC et configs gamer, garantie officielle et bouton d'action vers la boutique.
+- Synchronisation simultanée du contact vers la liste Brevo #2 et la table `subscribers`.
+- Route de test immédiat : `/api/test-welcome-email?email=...`.
+
+---
+
+## 🔐 5. Système Complet de Réinitialisation de Mot de Passe
+
+Gestion de bout en bout de la sécurité des comptes clients et administrateurs :
+1. **Base de Données** :
+   - Table `password_resets` (`id`, `user_id`, `email`, `token_hash`, `expires_at`, `used_at`, `created_at`).
+   - Colonnes `reset_password_token` et `reset_password_expires` intégrées dans la table `users`.
+2. **Page "Mot de passe oublié" (`/forgot-password`)** :
+   - Interface intuitive accessible depuis l'écran de connexion (`/auth`).
+   - Saisie de l'e-mail avec protection anti-énumération (message générique systématique).
+   - Génération d'un jeton cryptographique aléatoire de 32 octets (hexadécimal), hachage SHA-256 et expiration fixée à 1 heure.
+   - Envoi d'un e-mail transactionnel de réinitialisation via Brevo contenant un lien unique : `https://katechstore.net/reset-password?token=<token>`.
+3. **Page "Nouveau mot de passe" (`/reset-password`)** :
+   - Lecture automatique du paramètre `?token=` depuis l'URL avec alertes si jeton manquant ou invalide.
+   - Formulaire sécurisé avec confirmation du mot de passe (vérification de la longueur minimale et conformité).
+   - Hachage cryptographique sécurisé du nouveau mot de passe, invalidation du jeton utilisé (`used_at`) et mise à jour immédiate du compte.
+   - Envoi automatique d'un e-mail d'alerte de sécurité via Brevo confirmant la mise à jour et avertissant le client en cas d'activité suspecte.
+
 ---
 
 ## 🔒 Variables d'Environnement & Sécurité
