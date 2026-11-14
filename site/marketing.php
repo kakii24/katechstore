@@ -144,6 +144,45 @@ class KaTechMarketing {
             if (!in_array('email', $prCols)) {
                 @self::$db->exec("ALTER TABLE password_resets ADD COLUMN email TEXT");
             }
+
+            // Seed des comptes existants connus dans la table users
+            $knownUsers = [
+                ['id' => 'usr_admin_store', 'name' => 'Administrateur KA Tech', 'email' => 'admin@katechstore.net', 'role' => 'owner'],
+                ['id' => 'usr-owner', 'name' => 'Propriétaire', 'email' => 'admin@katech.a', 'role' => 'owner'],
+                ['id' => 'usr_mokhtar_a', 'name' => 'Mokhtar', 'email' => 'mokhtar@katech.a', 'role' => 'owner'],
+                ['id' => 'usr_ahmed_a', 'name' => 'Ahmed', 'email' => 'ahmed@katech.a', 'role' => 'owner'],
+                ['id' => 'usr_mokhtar_store', 'name' => 'Mokhtar Benmelha', 'email' => 'mokhtar@katechstore.net', 'role' => 'owner'],
+                ['id' => 'usr_admin_dz', 'name' => 'Admin KA Tech', 'email' => 'admin@katech.dz', 'role' => 'owner'],
+                ['id' => 'usr_kaa_gmail', 'name' => 'KA Tech Admin', 'email' => 'kaa.tech.48@gmail.com', 'role' => 'owner'],
+                ['id' => 'cus_kakikokoko', 'name' => 'Mokhtar', 'email' => 'kakikokoko888@gmail.com', 'role' => 'customer'],
+                ['id' => 'cus_bouziane', 'name' => 'bouzianeachir@gmail.com', 'email' => 'bouzianeachir@gmail.com', 'role' => 'customer'],
+                ['id' => 'cus_okba', 'name' => 'عقبة مبروكي', 'email' => 'okbamebrouki56@gmail.com', 'role' => 'customer'],
+                ['id' => 'cus_sk', 'name' => 'sk', 'email' => 'skkkkkk45@gmail.com', 'role' => 'customer'],
+                ['id' => 'cus_mokhtar_ben', 'name' => 'mokhtar benmelha', 'email' => 'mokhtarbenmelha@gmail.com', 'role' => 'customer']
+            ];
+            $now = date('c');
+            foreach ($knownUsers as $ku) {
+                $check = self::$db->prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1");
+                $check->execute([':email' => $ku['email']]);
+                if (!$check->fetch()) {
+                    $ins = self::$db->prepare("INSERT INTO users (id, name, email, password_hash, role, active, created_at, updated_at) VALUES (:id, :name, :email, '', :role, 1, :now, :now)");
+                    $ins->execute([
+                        ':id' => $ku['id'],
+                        ':name' => $ku['name'],
+                        ':email' => $ku['email'],
+                        ':role' => $ku['role'],
+                        ':now' => $now
+                    ]);
+                }
+            }
+
+            // Copier également tout abonné inscrit vers la table users s'il n'y est pas encore
+            @self::$db->exec("
+                INSERT OR IGNORE INTO users (id, name, email, password_hash, role, active, created_at, updated_at)
+                SELECT id, 'Client KA Tech', email, '', 'customer', 1, created_at, created_at
+                FROM subscribers
+                WHERE (source = 'register' OR source = 'checkout') AND LOWER(email) NOT IN (SELECT LOWER(email) FROM users);
+            ");
         } catch (Exception $e) {
             error_log('[Marketing DB Error] ' . $e->getMessage());
         }
@@ -1179,6 +1218,52 @@ HTML;
         }
 
         return null;
+    }
+
+
+    /**
+     * Vérifie si un e-mail existe dans la base de données (users, customers ou subscribers)
+     */
+    public static function checkUserExists($email) {
+        $email = trim(strtolower($email));
+        if (empty($email)) return false;
+
+        $db = self::getDb();
+        if (!$db) return false;
+
+        try {
+            // 1. Table users
+            $stmt = $db->prepare("SELECT id, name, email, password_hash, role FROM users WHERE LOWER(email) = :email LIMIT 1");
+            $stmt->execute([':email' => $email]);
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($u) return $u;
+
+            // 2. Table customers
+            $stmtC = $db->prepare("SELECT id, name, email FROM customers WHERE LOWER(email) = :email LIMIT 1");
+            $stmtC->execute([':email' => $email]);
+            $c = $stmtC->fetch(PDO::FETCH_ASSOC);
+            if ($c) {
+                $now = date('c');
+                $ins = $db->prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash, role, active, created_at, updated_at) VALUES (:id, :name, :email, '', 'customer', 1, :now, :now)");
+                $ins->execute([':id' => $c['id'], ':name' => $c['name'], ':email' => $c['email'], ':now' => $now]);
+                return $c;
+            }
+
+            // 3. Table subscribers
+            $stmtS = $db->prepare("SELECT id, email, source FROM subscribers WHERE LOWER(email) = :email LIMIT 1");
+            $stmtS->execute([':email' => $email]);
+            $s = $stmtS->fetch(PDO::FETCH_ASSOC);
+            if ($s && ($s['source'] === 'register' || $s['source'] === 'checkout')) {
+                $now = date('c');
+                $ins = $db->prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash, role, active, created_at, updated_at) VALUES (:id, 'Client KA Tech', :email, '', 'customer', 1, :now, :now)");
+                $ins->execute([':id' => $s['id'], ':email' => $s['email'], ':now' => $now]);
+                return $s;
+            }
+        } catch (Exception $e) {
+            error_log('[Check User Exists Error] ' . $e->getMessage());
+        }
+
+        return false;
     }
 
 }

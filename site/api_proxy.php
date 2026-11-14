@@ -93,13 +93,32 @@ if ((strpos($apiPath, '/auth/reset-password') !== false || strpos($requestUri, '
     exit;
 }
 
-// 6. Vérification Authentification locale si mot de passe réinitialisé en local : POST /api/v1/auth/login
+// 6. Traitement Authentification Login : POST /api/v1/auth/login
 if (strpos($apiPath, '/auth/login') !== false && $method === 'POST') {
     $raw = file_get_contents('php://input');
     $input = json_decode($raw, true) ?? [];
     $loginEmail = trim(strtolower($input['email'] ?? ''));
     $loginPassword = $input['password'] ?? '';
-    
+
+    // A. Vérifier si l'utilisateur existe dans la base de données
+    $existingUser = KaTechMarketing::checkUserExists($loginEmail);
+    if (!$existingUser) {
+        // L'utilisateur n'existe pas en base -> HTTP 404 avec USER_NOT_FOUND
+        http_response_code(404);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'errorCode' => 'USER_NOT_FOUND',
+            'error' => [
+                'code' => 'USER_NOT_FOUND',
+                'message' => "User doesn't exist. Create a new account?"
+            ],
+            'message' => "User doesn't exist. Create a new account?"
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // B. L'utilisateur existe : vérification du mot de passe
     $localAuth = KaTechMarketing::verifyLocalUserLogin($loginEmail, $loginPassword);
     if ($localAuth !== null) {
         header('Content-Type: application/json; charset=utf-8');
@@ -112,6 +131,22 @@ if (strpos($apiPath, '/auth/login') !== false && $method === 'POST') {
             'samesite' => 'Lax'
         ]);
         echo json_encode($localAuth, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Si mot de passe local défini mais invalide -> 401 INVALID_CREDENTIALS immédiat
+    if (!empty($existingUser['password_hash'])) {
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'errorCode' => 'INVALID_CREDENTIALS',
+            'error' => [
+                'code' => 'INVALID_CREDENTIALS',
+                'message' => 'Identifiants invalides.'
+            ],
+            'message' => 'Identifiants invalides.'
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
@@ -258,6 +293,19 @@ $body = substr($response, $headerSize);
 
 http_response_code($httpCode);
 
+// Formater l'erreur de mauvais mot de passe pour les comptes existants
+if (strpos($apiPath, '/auth/login') !== false && $httpCode === 401) {
+    $body = json_encode([
+        'success' => false,
+        'errorCode' => 'INVALID_CREDENTIALS',
+        'error' => [
+            'code' => 'INVALID_CREDENTIALS',
+            'message' => 'Identifiants invalides.'
+        ],
+        'message' => 'Identifiants invalides.'
+    ], JSON_UNESCAPED_UNICODE);
+}
+
 // Automatically synchronize web orders directly into Caisse journal with profit calculation
 if (strpos($apiPath, '/api/v1/orders') === 0 && $method === 'POST' && ($httpCode === 200 || $httpCode === 201)) {
     $orderData = json_decode($body, true);
@@ -387,6 +435,26 @@ if (strpos($apiPath, '/api/v1/auth/register') === 0 && $method === 'POST' && ($h
     if (!empty($regEmail)) {
         KaTechMarketing::captureSubscriber($regEmail, 'register');
         KaTechMarketing::sendWelcomeEmail($regEmail, $regName);
+
+        $db = KaTechMarketing::getDb();
+        if ($db) {
+            $now = date('c');
+            $rawPw = null;
+            if (!empty($rawInput)) {
+                $in = json_decode($rawInput, true);
+                $rawPw = $in['password'] ?? null;
+            }
+            $pHash = $rawPw ? password_hash($rawPw, PASSWORD_DEFAULT) : '';
+            $regId = $regData['data']['user']['id'] ?? $regData['data']['id'] ?? ('usr_' . bin2hex(random_bytes(8)));
+            $ins = $db->prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash, role, active, created_at, updated_at) VALUES (:id, :name, :email, :hash, 'customer', 1, :now, :now)");
+            $ins->execute([
+                ':id' => $regId,
+                ':name' => $regName ?: 'Client KA Tech',
+                ':email' => strtolower(trim($regEmail)),
+                ':hash' => $pHash,
+                ':now' => $now
+            ]);
+        }
     }
 }
 
