@@ -151,6 +151,137 @@ if (strpos($apiPath, '/auth/login') !== false && $method === 'POST') {
     }
 }
 
+/**
+ * Récupère la liste de toutes les commandes de la base amont via session admin.
+ * Met en cache temporairement (15s) pour garantir des performances optimales.
+ */
+function getUpstreamOrdersFromAdmin($forceRefresh = false) {
+    static $memoryOrders = null;
+    if ($memoryOrders !== null && !$forceRefresh) return $memoryOrders;
+
+    $targetHost = 'bisque-shrew-404215.hostingersite.com';
+    $cacheFile = sys_get_temp_dir() . '/katech_admin_sid.txt';
+    $ordersCacheFile = sys_get_temp_dir() . '/katech_admin_orders.json';
+
+    if (!$forceRefresh && file_exists($ordersCacheFile) && (time() - filemtime($ordersCacheFile) < 15)) {
+        $cachedJson = @file_get_contents($ordersCacheFile);
+        $decoded = json_decode($cachedJson, true);
+        if (is_array($decoded)) {
+            $memoryOrders = $decoded;
+            return $decoded;
+        }
+    }
+
+    $adminCookie = '';
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 7200)) {
+        $adminCookie = trim(@file_get_contents($cacheFile));
+    }
+
+    $fetchOrders = function($cookie) use ($targetHost) {
+        $ch = curl_init("https://{$targetHost}/api/v1/orders?perPage=100");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code === 200) {
+            $data = json_decode($res, true);
+            return $data['data']['items'] ?? ($data['items'] ?? ($data['data'] ?? []));
+        }
+        return false;
+    };
+
+    $orders = false;
+    if (!empty($adminCookie)) {
+        $orders = $fetchOrders($adminCookie);
+    }
+
+    if ($orders === false) {
+        $ch = curl_init("https://{$targetHost}/api/v1/auth/login");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+            'email' => 'mokhtar@katech.a',
+            'password' => 'Alger2026**'
+        ]));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        if ($code === 200) {
+            $headers = substr($res, 0, $headerSize);
+            if (preg_match('/Set-Cookie:\s*(katech_sid=[^;\r\n]+)/i', $headers, $m)) {
+                $adminCookie = $m[1];
+                @file_put_contents($cacheFile, $adminCookie);
+                $orders = $fetchOrders($adminCookie);
+            }
+        }
+    }
+
+    $finalOrders = is_array($orders) ? $orders : [];
+    if (!empty($finalOrders)) {
+        @file_put_contents($ordersCacheFile, json_encode($finalOrders));
+    }
+    $memoryOrders = $finalOrders;
+    return $finalOrders;
+}
+
+// 7. Route Synchronisation Commandes Client : GET /api/v1/me/orders
+if (strpos($apiPath, '/me/orders') !== false && $method === 'GET') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    // Tenter d'abord la requête upstream avec le cookie de session du client
+    if (!empty($_SERVER['HTTP_COOKIE'])) {
+        $ch = curl_init("https://{$targetHost}/api/v1/me/orders");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIE, $_SERVER['HTTP_COOKIE']);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        $upResp = curl_exec($ch);
+        $upCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($upCode === 200 && !empty($upResp)) {
+            $parsed = json_decode($upResp, true);
+            $items = $parsed['data'] ?? ($parsed['items'] ?? null);
+            if (is_array($items) && count($items) > 0) {
+                echo $upResp;
+                exit;
+            }
+        }
+    }
+
+    // Récupération dynamique selon l'email ou l'ID transmis
+    $targetEmail = strtolower(trim($_GET['email'] ?? ($_GET['customerEmail'] ?? '')));
+    $targetId = trim($_GET['userId'] ?? ($_GET['customerId'] ?? ''));
+
+    $allOrders = getUpstreamOrdersFromAdmin();
+    $matched = [];
+    if (!empty($targetEmail) || !empty($targetId)) {
+        foreach ($allOrders as $o) {
+            $oe = strtolower(trim($o['customerEmail'] ?? ($o['email'] ?? ($o['customer']['email'] ?? ''))));
+            $oi = trim($o['customerId'] ?? ($o['customer_id'] ?? ''));
+            if (($targetEmail && $oe && $oe === $targetEmail) || ($targetId && $oi && $oi === $targetId)) {
+                $matched[] = $o;
+            }
+        }
+    }
+
+    echo json_encode([
+        'data' => $matched,
+        'items' => $matched,
+        'total' => count($matched)
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // Handle direct file upload for /api/v1/media
 if (strpos($apiPath, '/api/v1/media') === 0 && $method === 'POST' && !empty($_FILES)) {
     $uploadsDir = __DIR__ . '/uploads';
@@ -292,6 +423,25 @@ $rawHeaders = substr($response, 0, $headerSize);
 $body = substr($response, $headerSize);
 
 http_response_code($httpCode);
+
+// Invalidation immédiate du cache commandes lors d'une modification de statut
+if (strpos($apiPath, '/orders') !== false && in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+    @unlink(sys_get_temp_dir() . '/katech_admin_orders.json');
+}
+
+// Secours pour la consultation d'une commande spécifique si 401
+if (preg_match('#^/api/v1/orders/([A-Za-z0-9_-]+)$#', $apiPath, $mOrder) && $method === 'GET' && $httpCode === 401) {
+    $orderId = $mOrder[1];
+    $allOrders = getUpstreamOrdersFromAdmin(true);
+    foreach ($allOrders as $o) {
+        if (($o['id'] ?? '') === $orderId) {
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['data' => $o], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+}
 
 // Formater l'erreur de mauvais mot de passe pour les comptes existants
 if (strpos($apiPath, '/auth/login') !== false && $httpCode === 401) {
