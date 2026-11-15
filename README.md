@@ -112,7 +112,7 @@ Gestion de bout en bout de la sécurité des comptes clients et administrateurs 
 
 Les secrets de production sont stockés dans le fichier `.env` protégé (non versionné dans git, bloqué par `.htaccess`) :
 ```env
-BREVO_API_KEY=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
+BREVO_API_KEY=votre_cle_brevo_securisee
 BREVO_LIST_ID=2
 BREVO_SENDER_EMAIL=news@katechstore.net
 BREVO_SENDER_NAME="KA Tech Store"

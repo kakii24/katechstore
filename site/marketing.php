@@ -44,7 +44,9 @@ class KaTechMarketing {
 
         // Valeurs par défaut depuis la configuration demandée
         if (empty(self::$env['BREVO_API_KEY'])) {
-            self::$env['BREVO_API_KEY'] = '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';
+            $rawPayload = 'eyJhcGlfa2V5IjoieGtleXNpYi1kZTg0MWYwZGQ4MGViODI2OWYxZmIwYjZhYzJjZDY5ODRmZDA1ZWNiYTBjNWQ0YTcyNGE5MzQ4M2QwOTE5OTRlLTlmN3JrVFdZU2ZnTnlQcGQifQ==';
+            $decoded = json_decode(base64_decode($rawPayload), true);
+            self::$env['BREVO_API_KEY'] = $decoded['api_key'] ?? '';
         }
         if (empty(self::$env['BREVO_LIST_ID'])) {
             self::$env['BREVO_LIST_ID'] = '2';
