@@ -6,6 +6,22 @@
       gtag('js', new Date());
     </script>
     <!-- prerendu-katech / -->
+    <script>
+      /* KA Tech Global Defensive Runtime Guards */
+      window.safeLocaleCompare = function(a, b, locale, options) {
+        var strA = String(a == null ? '' : a);
+        var strB = String(b == null ? '' : b);
+        return strA.localeCompare(strB, locale, options);
+      };
+      (function() {
+        var origCompare = String.prototype.localeCompare;
+        String.prototype.localeCompare = function(that, locales, options) {
+          var selfStr = String(this == null ? '' : this);
+          var thatStr = String(that == null ? '' : that);
+          return origCompare.call(selfStr, thatStr, locales, options);
+        };
+      })();
+    </script>
     <meta charset="UTF-8">
     <base href="/">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
