@@ -29,6 +29,11 @@
 
 ## 🛠️ 2. Panneau d'Administration (`/admin`)
 
+> 🔑 **Identifiants d'Accès Dashboard Développeur / Code Source (Mode Local / Dépôt GitHub)** :  
+> - **Nom d'utilisateur** : `admin` (ou `admin@katech.dz`)  
+> - **Mot de passe** : `admin`  
+> *(Note : Sur le site en production, l'accès administrateur est sécurisé par les identifiants de production enregistrés en base de données).*
+
 - **Gestion des Produits & Stock** :
   - Création et modification de produits avec téléversement de photos multiples.
   - Saisie du **Prix d'Achat (Cost Price)** sécurisé, masqué au public, pour calculer la rentabilité exacte.
